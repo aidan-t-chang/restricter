@@ -26,9 +26,15 @@ class MyApp extends StatelessWidget {
 
 class MyAppState extends ChangeNotifier {
   var current = WordPair.random();
+  var isLocked = false;
 
   void getNext() {
     current = WordPair.random();
+    notifyListeners();
+  }
+
+  void toggleLock() {
+    isLocked = !isLocked;
     notifyListeners();
   }
 }
@@ -41,34 +47,48 @@ class MyHomePage extends StatelessWidget {
 
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
           children: [
-            BigCard(pair: pair),
-            SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: () {
-                appState.getNext();
-              },
-              child: Text('Next'),
-            ),
-            ElevatedButton( 
-              onPressed: () {},
-              // icon of the button
-              child: Icon(Icons.menu, color: Colors.white), 
-              // styling the button
-              style: ElevatedButton.styleFrom( 
-                shape: CircleBorder(),
-                padding: EdgeInsets.all(20),
-                // Button color
-                backgroundColor: Colors.green, 
-                // Splash color
-                foregroundColor: Colors.cyan, 
+            Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(top:60),
+                child: ElevatedButton( 
+                  onPressed: () {
+                    appState.toggleLock();
+                  }, 
+                  // styling the button
+                  style: ElevatedButton.styleFrom( 
+                    shape: CircleBorder(),
+                    padding: EdgeInsets.all(30),
+                    // Button color
+                    backgroundColor: appState.isLocked ? Colors.red : Colors.green, 
+                    // Splash color
+                    foregroundColor: Colors.black, 
+                  ),
+                  // icon of the button
+                  child: Icon(appState.isLocked ? Icons.lock_outline : Icons.lock_open, size: 40)
+                ),
               ),
             ),
-            ],
-             ),
-      )
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  BigCard(pair: pair),
+                  SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () {
+                      appState.getNext();
+                    },
+                    child: Text('Next'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
