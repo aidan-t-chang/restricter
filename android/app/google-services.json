@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "89718562015",
+    "firebase_url": "https://test-project-690cb-default-rtdb.firebaseio.com",
+    "project_id": "test-project-690cb",
+    "storage_bucket": "test-project-690cb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:89718562015:android:35b1f3ed341e3245f95d6a",
+        "android_client_info": {
+          "package_name": "com.example.restricter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyABNkg5jkHYhHIgIkxMH4lQ7crHFEpjbrA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
