@@ -74,12 +74,15 @@ class MyAppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleLock() {
+  void toggleLockState() {
     isLocked = !isLocked;
-    for (var app in apps) {
-      app.isEnabled = true;
+    if (isLocked) {
+      // When locking, enable all apps
+      enableAll();
+    } else {
+      // When unlocking, disable all apps
+      disableAll();
     }
-    notifyListeners();
   }
 
   void toggleApp(int index) {
@@ -130,7 +133,7 @@ class MyHomePage extends StatelessWidget {
                 // Center button (Lock)
                 ElevatedButton( 
                   onPressed: () {
-                    appState.toggleLock();
+                    appState.toggleLockState();
                   }, 
                   style: ElevatedButton.styleFrom( 
                     shape: CircleBorder(),
