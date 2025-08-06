@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 
 class AppItem {
@@ -39,6 +40,8 @@ class MyApp extends StatelessWidget {
 class MyAppState extends ChangeNotifier {
   var current = WordPair.random();
   var isLocked = false;
+  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  String? _connectedDesktopId;
   
   List<AppItem> apps = [
     AppItem(name: 'Chrome', isEnabled: false),
@@ -47,10 +50,13 @@ class MyAppState extends ChangeNotifier {
     AppItem(name: 'Zoom', isEnabled: false),
   ];
 
+  String? get connectedDesktopId => _connectedDesktopId;
+
   void enableAll() {
     for (var app in apps) {
       app.isEnabled = true;
     }
+    _sendCommandToDesktop('enable_all');
     notifyListeners();
   }
 
@@ -58,6 +64,7 @@ class MyAppState extends ChangeNotifier {
     for (var app in apps) {
       app.isEnabled = false;
     }
+    _sendCommandToDesktop('disable_all');
     notifyListeners();
   }
 
@@ -88,8 +95,81 @@ class MyAppState extends ChangeNotifier {
 
   void toggleApp(int index) {
     apps[index].isEnabled = !apps[index].isEnabled;
+    
+    // Send command to desktop
+    _sendCommandToDesktop('toggle_app', params: {
+      'app_name': apps[index].name,
+      'enabled': apps[index].isEnabled
+    });
+    
     checkForAll(); // Check if we need to disable the lock button
     notifyListeners();
+  }
+
+  // Connect a desktop machine to this user
+  Future<void> connectDesktop(String desktopId, String desktopName) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      await _database
+          .child('desktop_connections')
+          .child(user.uid)
+          .child(desktopId)
+          .set({
+        'connected': true,
+        'last_seen': ServerValue.timestamp,
+        'desktop_name': desktopName,
+      });
+      
+      _connectedDesktopId = desktopId;
+      notifyListeners();
+    } catch (e) {
+      print('Error connecting desktop: $e');
+    }
+  }
+
+  // Send command to connected desktop
+  Future<void> _sendCommandToDesktop(String action, {Map<String, dynamic>? params}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || _connectedDesktopId == null) return;
+
+    try {
+      await _database
+          .child('commands')
+          .child(user.uid)
+          .push()
+          .set({
+        'action': action,
+        'timestamp': ServerValue.timestamp,
+        'desktop_id': _connectedDesktopId,
+        'params': params ?? {},
+      });
+    } catch (e) {
+      print('Error sending command: $e');
+    }
+  }
+
+  // Disconnect desktop
+  Future<void> disconnectDesktop() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || _connectedDesktopId == null) return;
+
+    try {
+      await _database
+          .child('desktop_connections')
+          .child(user.uid)
+          .child(_connectedDesktopId!)
+          .update({
+        'connected': false,
+        'last_seen': ServerValue.timestamp,
+      });
+      
+      _connectedDesktopId = null;
+      notifyListeners();
+    } catch (e) {
+      print('Error disconnecting desktop: $e');
+    }
   }
 }
 
@@ -119,16 +199,18 @@ class MyHomePage extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Left button (WiFi)
+                // Left button (Connection Status)
                 ElevatedButton( 
-                  onPressed: () {}, 
+                  onPressed: () {
+                    _showDesktopConnectionDialog(context, appState);
+                  }, 
                   style: ElevatedButton.styleFrom( 
                     shape: CircleBorder(),
                     padding: EdgeInsets.all(20),
-                    backgroundColor: Colors.blue, 
+                    backgroundColor: appState.connectedDesktopId != null ? Colors.green : Colors.red, 
                     foregroundColor: Colors.black, 
                   ),
-                  child: Icon(Icons.wifi, size: 30)
+                  child: Icon(Icons.computer, size: 30)
                 ),
                 SizedBox(width: 20),
                 // Center button (Lock)
@@ -147,7 +229,9 @@ class MyHomePage extends StatelessWidget {
                 SizedBox(width: 20),
                 // Right button (Settings)
                 ElevatedButton( 
-                  onPressed: () {}, 
+                  onPressed: () {
+                    _showDesktopConnectionDialog(context, appState);
+                  }, 
                   style: ElevatedButton.styleFrom( 
                     shape: CircleBorder(),
                     padding: EdgeInsets.all(20),
@@ -174,6 +258,135 @@ class MyHomePage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showDesktopConnectionDialog(BuildContext context, MyAppState appState) {
+    final TextEditingController desktopIdController = TextEditingController();
+    final TextEditingController desktopNameController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(appState.connectedDesktopId == null 
+            ? 'Connect Desktop' 
+            : 'Desktop Connection'),
+          content: appState.connectedDesktopId == null
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'To connect your desktop:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  SizedBox(height: 12),
+                  Text('1. Install and run the Restricter desktop app'),
+                  Text('2. Find your Desktop ID in the app window'),
+                  Text('3. Copy the 8-character ID (e.g., A1B2C3D4)'),
+                  Text('4. Enter the ID and name below'),
+                  SizedBox(height: 20),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info, color: Colors.blue, size: 20),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Desktop ID is displayed in your Restricter desktop application',
+                            style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  TextField(
+                    controller: desktopIdController,
+                    decoration: InputDecoration(
+                      labelText: 'Desktop ID',
+                      hintText: 'e.g., A1B2C3D4',
+                      border: OutlineInputBorder(),
+                      helperText: 'Found in your desktop Restricter app',
+                    ),
+                    textCapitalization: TextCapitalization.characters,
+                    maxLength: 12,
+                  ),
+                  SizedBox(height: 10),
+                  TextField(
+                    controller: desktopNameController,
+                    decoration: InputDecoration(
+                      labelText: 'Desktop Name',
+                      hintText: 'e.g., My Work Computer',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.computer, color: Colors.green, size: 48),
+                  SizedBox(height: 16),
+                  Text(
+                    'Connected to:',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
+                  Text(
+                    '${appState.connectedDesktopId}',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 8),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Status: Connected',
+                      style: TextStyle(color: Colors.green.shade700, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+          actions: [
+            if (appState.connectedDesktopId != null)
+              TextButton(
+                onPressed: () {
+                  appState.disconnectDesktop();
+                  Navigator.of(context).pop();
+                },
+                child: Text('Disconnect', style: TextStyle(color: Colors.red)),
+              ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            if (appState.connectedDesktopId == null)
+              ElevatedButton(
+                onPressed: () {
+                  if (desktopIdController.text.isNotEmpty && 
+                      desktopNameController.text.isNotEmpty) {
+                    appState.connectDesktop(
+                      desktopIdController.text.trim().toUpperCase(),
+                      desktopNameController.text.trim(),
+                    );
+                    Navigator.of(context).pop();
+                  }
+                },
+                child: Text('Connect'),
+              ),
+          ],
+        );
+      },
     );
   }
 }
