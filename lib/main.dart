@@ -72,7 +72,7 @@ class MyAppState extends ChangeNotifier {
     for (var app in apps) {
       if (app.isEnabled == false) {
         isLocked = false;
-        return; // Exit early if any app is disabled
+        return; 
       } 
     }
   }
@@ -85,10 +85,8 @@ class MyAppState extends ChangeNotifier {
   void toggleLockState() {
     isLocked = !isLocked;
     if (isLocked) {
-      // When locking, enable all apps
       enableAll();
     } else {
-      // When unlocking, disable all apps
       disableAll();
     }
   }
@@ -117,8 +115,12 @@ class MyAppState extends ChangeNotifier {
           .child(user.uid)
           .child(desktopId)
           .set({
+        'desktop_id': desktopId,
+        'user_id': user.uid,
+        'message': 'Connected to $desktopName',
+        'timestamp': ServerValue.timestamp,
+
         'connected': true,
-        'last_seen': ServerValue.timestamp,
         'desktop_name': desktopName,
       });
       
@@ -140,10 +142,11 @@ class MyAppState extends ChangeNotifier {
           .child(user.uid)
           .push()
           .set({
-        'action': action,
-        'timestamp': ServerValue.timestamp,
-        'desktop_id': _connectedDesktopId,
-        'params': params ?? {},
+            'user_id': user.uid,
+            'desktop_id': _connectedDesktopId,
+            'message': action,
+            'timestamp': ServerValue.timestamp,
+            'params': params ?? {},
       });
     } catch (e) {
       print('Error sending command: $e');
@@ -317,7 +320,7 @@ class MyHomePage extends StatelessWidget {
                       helperText: 'Found in your desktop Restricter app',
                     ),
                     textCapitalization: TextCapitalization.characters,
-                    maxLength: 12,
+                    maxLength: 8,
                   ),
                   SizedBox(height: 10),
                   TextField(
