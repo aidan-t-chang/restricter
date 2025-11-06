@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'firebase_options.dart';
 
 
 class AppItem {
@@ -15,8 +16,10 @@ class AppItem {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  runApp(MyApp());
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -37,6 +40,8 @@ class MyApp extends StatelessWidget {
   }
 }
 
+
+// automatically create the key-id in the realtime database when the user opens the app
 class MyAppState extends ChangeNotifier {
   var current = WordPair.random();
   var isLocked = false;

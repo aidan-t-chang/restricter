@@ -1,14 +1,13 @@
 {
   "project_info": {
-    "project_number": "89718562015",
-    "firebase_url": "https://test-project-690cb-default-rtdb.firebaseio.com",
-    "project_id": "test-project-690cb",
-    "storage_bucket": "test-project-690cb.firebasestorage.app"
+    "project_number": "338191781683",
+    "project_id": "restricter-connector",
+    "storage_bucket": "restricter-connector.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:89718562015:android:35b1f3ed341e3245f95d6a",
+        "mobilesdk_app_id": "1:338191781683:android:2913fef37439c967023846",
         "android_client_info": {
           "package_name": "com.example.restricter"
         }
@@ -16,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyABNkg5jkHYhHIgIkxMH4lQ7crHFEpjbrA"
+          "current_key": "AIzaSyBbMs53bAK1M0ez7JBnfODOdD8kP-ax3nw"
         }
       ],
       "services": {
