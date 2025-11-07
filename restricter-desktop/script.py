@@ -9,6 +9,12 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import time
+import firebase_admin
+from firebase_admin import credentials, db
+
+cred = credentials.Certificate("rcconfig.json")
+firebase_admin.initialize_app(cred, {'databaseURL': "https://restricter-connector-default-rtdb.firebaseio.com/"})
+ref = db.reference()
 
 class RestricterDesktop:
     def __init__(self):
@@ -36,19 +42,26 @@ class RestricterDesktop:
     
     def get_or_create_desktop_id(self):
         config_file = "restricter_config.json"
-        
+
         if os.path.exists(config_file):
             try:
                 with open(config_file, 'r') as f:
                     config = json.load(f)
                     desktop_id = config.get('desktop_id')
                     if desktop_id and len(desktop_id) == 8:
+                        try: 
+                            ref.set({desktop_id: -1})
+                            print(f"successfully saved to database {desktop_id}")
+                        except Exception as e:
+                            print(f"failed to update the database: {e}")       
                         return desktop_id
             except (json.JSONDecodeError, FileNotFoundError):
                 pass
-        
+
+        # use the desktop id as the key in the firebase rtdb
         desktop_id = self.generate_desktop_id()
-        
+
+
         config = {
             'desktop_id': desktop_id,
             'created_at': time.time(),
@@ -60,7 +73,13 @@ class RestricterDesktop:
                 json.dump(config, f, indent=2)
         except Exception as e:
             print(f"Warning: Could not save config file: {e}")
-        
+
+        try: 
+            ref.set({desktop_id: -1})
+            print(f"successfully saved to database {desktop_id}")
+        except Exception as e:
+            print(f"failed to update the database: {e}")       
+
         return desktop_id
     
     def setup_gui(self):

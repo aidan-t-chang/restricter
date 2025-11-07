@@ -11,6 +11,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+restricter-desktop/rcconfig.json
 
 # IntelliJ related
 *.iml
