@@ -167,6 +167,15 @@ class RestricterDesktop:
         if messagebox.askyesno("Regenerate ID", 
                              "Are you sure you want to generate a new Desktop ID?\n\n"
                              "This will disconnect any existing mobile app connections."):
+
+            # delete old desktop id from the database
+            old_desktop_id = self.desktop_id
+            try:
+                ref.child(old_desktop_id).delete()
+                print(f"Successfully deleted old desktop ID from database: {old_desktop_id}")
+            except Exception as e:
+                print(f"Warning: Could not delete old ID from database: {e}")
+            
             try:
                 if os.path.exists("restricter_config.json"):
                     os.remove("restricter_config.json")
