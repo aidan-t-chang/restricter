@@ -113,26 +113,19 @@ class MyAppState extends ChangeNotifier {
   Future<void> connectDesktop(String desktopId, String desktopName) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+    // need to figure out how to set this user.uid to the uuid present in the database
 
     try {
+      // the user.uid is necessary for the database read/write permissions
       await _database
-          .child('desktop_connections')
-          .child(user.uid)
           .child(desktopId)
-          .set({
-        'desktop_id': desktopId,
-        'user_id': user.uid,
-        'message': 'Connected to $desktopName',
-        'timestamp': ServerValue.timestamp,
+          .child('connected')
+          .set(true);
 
-        'connected': true,
-        'desktop_name': desktopName,
-      });
-      
       _connectedDesktopId = desktopId;
       notifyListeners();
     } catch (e) {
-      print('Error connecting desktop: $e');
+      print('Error connecting desktop. Make sure you have the correct Desktop ID. $e');
     }
   }
 
