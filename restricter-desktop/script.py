@@ -49,13 +49,12 @@ class RestricterDesktop:
                 with open(config_file, 'r') as f:
                     config = json.load(f)
                     desktop_id = config.get('desktop_id')
-                    uid = config.get("uuid")
                     if desktop_id and len(desktop_id) == 8:
                         try: 
                             # desktop_id {uid, desktop_id, cmd_value}
                             ref.set({
                                 desktop_id: {
-                                    "uid" : uid,
+                                    "uid" : -1,
                                     "cmd_value" : -1,
                                     "connected" : False
                                 }
@@ -69,13 +68,11 @@ class RestricterDesktop:
 
         # use the desktop id as the key in the firebase rtdb
         desktop_id = self.generate_desktop_id()
-        uid = str(uuid.uuid4())
 
         config = {
             'desktop_id': desktop_id,
             'created_at': time.time(),
             'machine_name': platform.node(),
-            'uuid' : uid
         }
         
         try:
@@ -87,12 +84,12 @@ class RestricterDesktop:
         try: 
             ref.set({
                 desktop_id: {
-                    "uid" : uid,
+                    "uid" : -1,
                     "cmd_value" : -1,
                     "connected" : False
                 } 
             })
-            print(f"successfully saved to database {desktop_id}")
+            print(f"config file didn't exist. successfully saved to database {desktop_id}")
         except Exception as e:
             print(f"failed to update the database: {e}")       
 

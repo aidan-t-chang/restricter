@@ -45,7 +45,7 @@ class MyApp extends StatelessWidget {
 class MyAppState extends ChangeNotifier {
   var current = WordPair.random();
   var isLocked = false;
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  DatabaseReference _database = FirebaseDatabase.instance.ref();
   String? _connectedDesktopId;
   
   List<AppItem> apps = [
@@ -113,7 +113,6 @@ class MyAppState extends ChangeNotifier {
   Future<void> connectDesktop(String desktopId, String desktopName) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    // need to figure out how to set this user.uid to the uuid present in the database
 
     try {
       // the user.uid is necessary for the database read/write permissions
@@ -122,10 +121,15 @@ class MyAppState extends ChangeNotifier {
           .child('connected')
           .set(true);
 
+      await _database
+          .child(desktopId)
+          .child('uid')
+          .set(user.uid);
       _connectedDesktopId = desktopId;
       notifyListeners();
+      print("successfull connected to desktop: $desktopId");
     } catch (e) {
-      print('Error connecting desktop. Make sure you have the correct Desktop ID. $e');
+      print('Error connecting desktop. Make sure you inputted the correct Desktop ID. $e');
     }
   }
 
