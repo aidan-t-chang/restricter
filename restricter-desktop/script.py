@@ -21,7 +21,8 @@ class RestricterDesktop:
     def __init__(self):
         self.desktop_id = self.get_or_create_desktop_id()
         self.setup_gui()
-        
+        self.last_rolling_code = 0
+
     def generate_desktop_id(self):
         characters = string.ascii_uppercase + string.digits
         safe_characters = ''.join(c for c in characters if c not in '01IO')
@@ -51,12 +52,14 @@ class RestricterDesktop:
                     desktop_id = config.get('desktop_id')
                     if desktop_id and len(desktop_id) == 8:
                         try: 
-                            # desktop_id {uid, desktop_id, cmd_value}
                             ref.set({
+                                # last toggle allows for checking whether to update and run the script
+                                # rolling code allows checking for toggles/running same command twice
                                 desktop_id: {
                                     "uid" : -1,
                                     "cmd_value" : -1,
-                                    "connected" : False
+                                    "connected" : False,
+                                    "rolling-code" : 0,
                                 }
                             })
                             print(f"successfully saved to database {desktop_id}")
@@ -86,7 +89,8 @@ class RestricterDesktop:
                 desktop_id: {
                     "uid" : -1,
                     "cmd_value" : -1,
-                    "connected" : False
+                    "connected" : False,
+                    "rolling_code" : 0,
                 } 
             })
             print(f"config file didn't exist. successfully saved to database {desktop_id}")
@@ -222,5 +226,5 @@ def main():
         print(f"Error: {e}")
         input("Press Enter to exit...")
 
-
+# need some sort of loop that checks every 5 seconds if the rolling code or cmd_value has changed
 main()

@@ -40,8 +40,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-
-// automatically create the key-id in the realtime database when the user opens the app
 class MyAppState extends ChangeNotifier {
   var current = WordPair.random();
   var isLocked = false;
@@ -61,7 +59,7 @@ class MyAppState extends ChangeNotifier {
     for (var app in apps) {
       app.isEnabled = true;
     }
-    _sendCommandToDesktop('enable_all');
+    _sendCommandToDesktop(_connectedDesktopId!, 0);
     notifyListeners();
   }
 
@@ -69,7 +67,7 @@ class MyAppState extends ChangeNotifier {
     for (var app in apps) {
       app.isEnabled = false;
     }
-    _sendCommandToDesktop('disable_all');
+    _sendCommandToDesktop(_connectedDesktopId!, 1);
     notifyListeners();
   }
 
@@ -100,10 +98,7 @@ class MyAppState extends ChangeNotifier {
     apps[index].isEnabled = !apps[index].isEnabled;
     
     // Send command to desktop
-    _sendCommandToDesktop('toggle_app', params: {
-      'app_name': apps[index].name,
-      'enabled': apps[index].isEnabled
-    });
+    _sendCommandToDesktop(_connectedDesktopId!, 1);
     
     checkForAll(); // Check if we need to disable the lock button
     notifyListeners();
@@ -125,6 +120,18 @@ class MyAppState extends ChangeNotifier {
           .child(desktopId)
           .child('uid')
           .set(user.uid);
+
+      await _database
+          .child(desktopId)
+          .child('desktop_name')
+          .set(desktopName);
+      
+      final rollingcode = await getRTDBValue('$desktopId/rolling_code') ?? 0;
+      await _database
+          .child(desktopId)
+          .child('rolling_code')
+          .set(rollingcode+1);
+        
       _connectedDesktopId = desktopId;
       notifyListeners();
       print("successfull connected to desktop: $desktopId");
@@ -134,22 +141,15 @@ class MyAppState extends ChangeNotifier {
   }
 
   // Send command to connected desktop
-  Future<void> _sendCommandToDesktop(String action, {Map<String, dynamic>? params}) async {
+  Future<void> _sendCommandToDesktop(String desktopId, int cmdValue) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || _connectedDesktopId == null) return;
 
     try {
       await _database
-          .child('commands')
-          .child(user.uid)
-          .push()
-          .set({
-            'user_id': user.uid,
-            'desktop_id': _connectedDesktopId,
-            'message': action,
-            'timestamp': ServerValue.timestamp,
-            'params': params ?? {},
-      });
+          .child(desktopId)
+          .child('cmd_value') 
+          .set(cmdValue);
     } catch (e) {
       print('Error sending command: $e');
     }
@@ -174,6 +174,18 @@ class MyAppState extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       print('Error disconnecting desktop: $e');
+    }
+  }
+
+  Future<dynamic> getRTDBValue(String path) async {
+    try {
+      DatabaseReference ref = FirebaseDatabase.instance.ref(path);
+      DatabaseEvent event = await ref.once();
+      return event.snapshot.value;
+    }
+    catch (e) {
+      print('Error getting Realtime Database Value: $e');
+      return null;
     }
   }
 }
