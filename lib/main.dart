@@ -125,16 +125,10 @@ class MyAppState extends ChangeNotifier {
           .child(desktopId)
           .child('desktop_name')
           .set(desktopName);
-      
-      final rollingcode = await getRTDBValue('$desktopId/rolling_code') ?? 0;
-      await _database
-          .child(desktopId)
-          .child('rolling_code')
-          .set(rollingcode+1);
-        
+
       _connectedDesktopId = desktopId;
       notifyListeners();
-      print("successfull connected to desktop: $desktopId");
+      print("successfully connected to desktop: $desktopId");
     } catch (e) {
       print('Error connecting desktop. Make sure you inputted the correct Desktop ID. $e');
     }
@@ -150,6 +144,15 @@ class MyAppState extends ChangeNotifier {
           .child(desktopId)
           .child('cmd_value') 
           .set(cmdValue);
+      
+      final rollingcode = await getRTDBValue('$desktopId/rolling_code') ?? 0;
+      await _database
+          .child(desktopId)
+          .child('rolling_code')
+          .set(rollingcode+1);
+      
+      print("command sent to desktop: $desktopId with cmdValue: $cmdValue");
+        
     } catch (e) {
       print('Error sending command: $e');
     }
@@ -162,12 +165,13 @@ class MyAppState extends ChangeNotifier {
 
     try {
       await _database
-          .child('desktop_connections')
-          .child(user.uid)
           .child(_connectedDesktopId!)
           .update({
         'connected': false,
-        'last_seen': ServerValue.timestamp,
+        'desktop_name': null,
+        'rolling_code': 0,
+        'cmd_value': -1,
+        'uid': null,
       });
       
       _connectedDesktopId = null;
