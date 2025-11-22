@@ -20,8 +20,8 @@ ref = db.reference()
 class RestricterDesktop:
     def __init__(self):
         self.desktop_id = self.get_or_create_desktop_id()
-        self.setup_gui()
         self.last_rolling_code = 0
+        self.setup_gui()
 
     def generate_desktop_id(self):
         characters = string.ascii_uppercase + string.digits
@@ -59,7 +59,7 @@ class RestricterDesktop:
                                     "uid" : -1,
                                     "cmd_value" : -1,
                                     "connected" : False,
-                                    "rolling-code" : 0,
+                                    "rolling_code" : 0,
                                 }
                             })
                             print(f"successfully saved to database {desktop_id}")
@@ -128,7 +128,7 @@ class RestricterDesktop:
         
         copy_button = ttk.Button(
             id_frame, 
-            text="📋 Copy ID", 
+            text="Copy ID", 
             command=self.copy_id
         )
         copy_button.pack(pady=5)
@@ -171,6 +171,9 @@ class RestricterDesktop:
             wraplength=400
         )
         instructions_label.pack(anchor="w")
+
+        self.poll_connection_status()
+        self.check_cmd_value()
     
     def copy_id(self):
         try:
@@ -208,6 +211,34 @@ class RestricterDesktop:
         self.root.after(3000, lambda: self.status_label.config(
             text="Status: Ready for connection", foreground="orange"
         ))
+
+    def check_connection(self):
+        try:
+            connected = ref.child(self.desktop_id).child("connected").get()
+            return bool(connected)
+        except Exception as e:
+            print(f"Error checking connection status: {e}")
+            return False
+
+    def poll_connection_status(self):
+        connected = self.check_connection()
+        if connected:
+            self.status_label.config(text="Status: Connected to mobile app", foreground="green")
+        else:
+            self.status_label.config(text="Status: Waiting for mobile app", foreground="orange")
+        
+        # check every 5 seconds
+        self.root.after(5000, self.poll_connection_status)
+
+    def check_cmd_value(self):
+        new_cmd_value = ref.child(self.desktop_id).child('cmd_value').get()
+        new_rolling_code = ref.child(self.desktop_id).child('rolling_code').get()
+
+        if self.last_rolling_code != new_rolling_code:
+            print(f'rolling code updated. new cmd value: {new_cmd_value}')
+            self.last_rolling_code = new_rolling_code
+        self.root.after(1000, self.check_cmd_value)
+         
     
     def run(self):
         print(f"Restricter Desktop starting...")
