@@ -53,6 +53,8 @@ class MyAppState extends ChangeNotifier {
     AppItem(name: 'Zoom', isEnabled: false),
   ];
 
+  // procedurally update apps based on user's apps
+
   String? get connectedDesktopId => _connectedDesktopId;
 
   void enableAll() {

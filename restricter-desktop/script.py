@@ -60,6 +60,7 @@ class RestricterDesktop:
                                     "cmd_value" : -1,
                                     "connected" : False,
                                     "rolling_code" : 0,
+                                    "applications" : [], # not entirely sure what these would be stored as
                                 }
                             })
                             print(f"successfully saved to database {desktop_id}")
