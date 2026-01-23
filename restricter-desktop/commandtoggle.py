@@ -331,6 +331,18 @@ def add_rule_file_path(xml_source, rule_path=None, action="Allow", name=None, de
 
     return rule_id, xml_str.decode('utf-8')
 
+def get_effective_policy_file(output_path="current.xml"):
+    cmd = f"Get-AppLockerPolicy -Effective -Xml | Out-File -FilePath '{output_path}' -Encoding UTF8"
+    completed = r(cmd)
+
+    # The command runs without error
+    if completed.returncode == 0:
+        print(f"written to file {output_path}")
+        return True
+    else:
+        print("failed to retrieve active policy.")
+        return False
+
 contStatement = True
 
 while contStatement:
