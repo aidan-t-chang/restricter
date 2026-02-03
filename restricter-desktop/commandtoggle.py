@@ -123,9 +123,20 @@ def disable_xmlcommands(whoDunnit):
 
     return r(entire_cmd)
 
-def appLockerPolicyExists(filePath):
-    checker = r(f"Test-AppLockerPolicy -Path '{filePath}' -User $env:USERNAME")
-    return True if checker else False # test-applockerpolicy usually returns nothing if there is no policy
+def check_rule_in_xml(xml_source, target_path):
+    """Checks if a FilePathRule exists for the given path in the XML."""
+    if isinstance(xml_source, str) and os.path.exists(xml_source):
+        tree = ET.parse(xml_source)
+        root = tree.getroot()
+    else:
+        root = ET.fromstring(xml_source)
+
+    for rule_collection in root.findall('.//RuleCollection[@Type="Path"]'):
+        for rule in rule_collection.findall('FilePathRule'):
+            condition = rule.find('.//FilePathCondition')
+            if condition is not None and condition.get('Path') == target_path:
+                return True
+    return False
 
 
 def add_file_path_rule(xml_file, file_path, action="Deny", name="*", description=""):
@@ -358,16 +369,43 @@ while contStatement:
    
    # input 1: toggle Microsoft Edge
     if inp == 1:
-        if appLockerPolicyExists("C:\\Program Files (x86)\\Microsoft"):
-            remove_file_path_rule_by_path(defaults, "C:\\Program Files (x86)\\Microsoft")
+        effective_xml = os.path.join(current_dir, "effective.xml")
+        target_path = "C:\\Program Files (x86)\\Microsoft"
+        
+        print("Fetching current active policy...")
+        if get_effective_policy_file(effective_xml):
+            if check_rule_in_xml(effective_xml, target_path):
+                remove_file_path_rule_by_path(effective_xml, target_path)
+                print(f"Removed rule for {target_path}")
+            else:
+                add_file_path_rule(effective_xml, target_path, action="Deny")
+                print(f"Added rule for {target_path}")
+            
+            print("Applying new policy to Windows...")
+            command = r(f"Set-AppLockerPolicy -XmlPolicy '{effective_xml}' -Merge")
+            if command.returncode != 0:
+                print("command err: " + str(command.stderr))
         else:
-            add_file_path_rule(defaults, "C:\\Program Files (x86)\\Microsoft")
+            print("Error: Could not retrieve current policy.")
+
     # input 2: google chrome in its entirety
     elif inp == 2:
-        if appLockerPolicyExists("C:\\Program Files\\Google\\Chrome\\Application"):
-            remove_file_path_rule_by_path(defaults, "C:\\Program Files\\Google\\Chrome\\Application")
+        effective_xml = os.path.join(current_dir, "effective.xml")
+        target_path = "C:\\Program Files\\Google\\Chrome\\Application"
+        
+        print("Fetching current active policy...")
+        if get_effective_policy_file(effective_xml):
+            if check_rule_in_xml(effective_xml, target_path):
+                remove_file_path_rule_by_path(effective_xml, target_path)
+                print(f"Removed rule for {target_path}")
+            else:
+                add_file_path_rule(effective_xml, target_path, action="Deny")
+                print(f"Added rule for {target_path}")
+            
+            print("Applying new policy to Windows...")
+            r(f"Set-AppLockerPolicy -XmlPolicy '{effective_xml}'")
         else:
-            add_file_path_rule(defaults, "C:\\Program Files\\Google\\Chrome\\Application")
+             print("Error: Could not retrieve current policy.")
     # input 3: command prompt (completely functional)
     elif inp == 3:
         # if the windows\system path does not exist, create it. if it does exist, don't do anything
@@ -410,6 +448,14 @@ while contStatement:
             file.write(old)
         reg_command = f"Set-AppLockerPolicy -XmlPolicy \"{reg_dir}\""
         print("Turned on")
+    # output an xml formatted version of the current applocker policy
+    elif inp == 6:
+        regedit_xml = r_string("Get-ChildItem C:\\Windows\\regedit.exe | Get-AppLockerFileInformation | New-AppLockerPolicy -RuleType Path -AllowWindows -User Everyone -Xml > regxml.xml")
+        with open("regxml.xml", "r") as file:
+            arr = file.readlines()
+            for line in arr:
+                print(line)
+       
     elif inp == 0:
         contStatement = False
 
