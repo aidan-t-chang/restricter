@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 defaults = """
 <AppLockerPolicy Version="1">
-    <RuleCollection Type="Exe" EnforcementMode="NotConfigured">
+    <RuleCollection Type="Exe" EnforcementMode="Enabled">
         <FilePublisherRule Id="46652a30-5fad-467d-9950-b73c36c60327" Name="Signed by O=MICROSOFT CORPORATION, L=REDMOND, S=WASHINGTON, C=US" Description="" UserOrGroupSid="S-1-1-0" Action="Allow">
             <Conditions>
                 <FilePublisherCondition PublisherName="O=MICROSOFT CORPORATION, L=REDMOND, S=WASHINGTON, C=US" ProductName="*" BinaryName="*">
@@ -43,16 +43,16 @@ defaults = """
             </Conditions>
         </FilePathRule>
     </RuleCollection>
-    <RuleCollection Type="Msi" EnforcementMode="NotConfigured">
+    <RuleCollection Type="Msi" EnforcementMode="Enabled">
         <FilePathRule Id="b9af7461-1b0e-41b1-bce5-42b50efeeb23" Name="*" Description="" UserOrGroupSid="S-1-1-0" Action="Deny">
             <Conditions>
                 <FilePathCondition Path="*"/>
             </Conditions>
         </FilePathRule>
     </RuleCollection>
-    <RuleCollection Type="Script" EnforcementMode="NotConfigured"/>
-    <RuleCollection Type="Dll" EnforcementMode="NotConfigured"/>
-    <RuleCollection Type="Appx" EnforcementMode="NotConfigured">
+    <RuleCollection Type="Script" EnforcementMode="Enabled"/>
+    <RuleCollection Type="Dll" EnforcementMode="Enabled"/>
+    <RuleCollection Type="Appx" EnforcementMode="Enabled">
         <FilePublisherRule Id="a9e18c21-ff8f-43cf-b9fc-db40eed693ba" Name="(Default Rule) All signed packaged apps" Description="Allows members of the Everyone group to run packaged apps that are signed." UserOrGroupSid="S-1-1-0" Action="Allow">
             <Conditions>
                 <FilePublisherCondition PublisherName="*" ProductName="*" BinaryName="*">
@@ -448,14 +448,10 @@ while contStatement:
             file.write(old)
         reg_command = f"Set-AppLockerPolicy -XmlPolicy \"{reg_dir}\""
         print("Turned on")
-    # output an xml formatted version of the current applocker policy
+    # get the current active applocker policies
     elif inp == 6:
-        regedit_xml = r_string("Get-ChildItem C:\\Windows\\regedit.exe | Get-AppLockerFileInformation | New-AppLockerPolicy -RuleType Path -AllowWindows -User Everyone -Xml > regxml.xml")
-        with open("regxml.xml", "r") as file:
-            arr = file.readlines()
-            for line in arr:
-                print(line)
-       
+        line_policies = r_string("(Get-AppLockerPolicy -Effective).RuleCollections")
+        print(line_policies.stdout)
     elif inp == 0:
         contStatement = False
 

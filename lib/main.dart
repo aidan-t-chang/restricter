@@ -11,7 +11,9 @@ import 'firebase_options.dart';
 class AppItem {
   String name;
   bool isEnabled;
-  AppItem({required this.name, required this.isEnabled});
+  int cmdValue;       // matches COMMANDS map in ai-commandtoggle.py (1–7, 9)
+  String? appExe;     // only needed for dynamic apps (cmdValue == 9)
+  AppItem({required this.name, required this.isEnabled, required this.cmdValue, this.appExe});
 }
 
 void main() async {
@@ -46,11 +48,14 @@ class MyAppState extends ChangeNotifier {
   DatabaseReference _database = FirebaseDatabase.instance.ref();
   String? _connectedDesktopId;
   
+  // cmd_value numbers match COMMANDS in ai-commandtoggle.py
   List<AppItem> apps = [
-    AppItem(name: 'Chrome', isEnabled: false),
-    AppItem(name: 'Edge', isEnabled: true),
-    AppItem(name: 'PyCharm', isEnabled: false),
-    AppItem(name: 'Zoom', isEnabled: false),
+    AppItem(name: 'Microsoft Edge',   isEnabled: false, cmdValue: 1),
+    AppItem(name: 'Google Chrome',    isEnabled: false, cmdValue: 2),
+    AppItem(name: 'Command Prompt',   isEnabled: false, cmdValue: 3),
+    AppItem(name: 'Registry Editor',  isEnabled: false, cmdValue: 5),
+    AppItem(name: 'MSI Installer',    isEnabled: false, cmdValue: 6),
+    AppItem(name: 'Microsoft Store',  isEnabled: false, cmdValue: 7),
   ];
 
   // procedurally update apps based on user's apps
@@ -61,7 +66,8 @@ class MyAppState extends ChangeNotifier {
     for (var app in apps) {
       app.isEnabled = true;
     }
-    _sendCommandToDesktop(_connectedDesktopId!, 0);
+    // cmd_value 4 = total lockdown toggle; desktop script detects current state and acts accordingly
+    _sendCommandToDesktop(_connectedDesktopId!, 4);
     notifyListeners();
   }
 
@@ -69,7 +75,8 @@ class MyAppState extends ChangeNotifier {
     for (var app in apps) {
       app.isEnabled = false;
     }
-    _sendCommandToDesktop(_connectedDesktopId!, 1);
+    // cmd_value 4 = total lockdown toggle
+    _sendCommandToDesktop(_connectedDesktopId!, 4);
     notifyListeners();
   }
 
@@ -98,11 +105,11 @@ class MyAppState extends ChangeNotifier {
 
   void toggleApp(int index) {
     apps[index].isEnabled = !apps[index].isEnabled;
-    
-    // Send command to desktop
-    _sendCommandToDesktop(_connectedDesktopId!, 1);
-    
-    checkForAll(); // Check if we need to disable the lock button
+
+    // Send the per-app command number to the desktop
+    _sendCommandToDesktop(_connectedDesktopId!, apps[index].cmdValue, appExe: apps[index].appExe);
+
+    checkForAll();
     notifyListeners();
   }
 
@@ -129,6 +136,7 @@ class MyAppState extends ChangeNotifier {
           .set(desktopName);
 
       _connectedDesktopId = desktopId;
+      await _fetchDynamicApps(desktopId);
       notifyListeners();
       print("successfully connected to desktop: $desktopId");
     } catch (e) {
@@ -136,25 +144,55 @@ class MyAppState extends ChangeNotifier {
     }
   }
 
-  // Send command to connected desktop
-  Future<void> _sendCommandToDesktop(String desktopId, int cmdValue) async {
+  Future<void> _fetchDynamicApps(String desktopId) async {
+    try {
+      final data = await getRTDBValue('$desktopId/dynamic_apps');
+      if (data == null) return;
+
+      List<dynamic> appList = [];
+      if (data is List) {
+        appList = data;
+      } else if (data is Map) {
+        appList = data.values.toList();
+      }
+
+      // Remove any previously loaded dynamic apps before repopulating
+      apps.removeWhere((a) => a.cmdValue == 9);
+
+      for (var item in appList) {
+        if (item is Map) {
+          final name = item['name']?.toString();
+          final exe = item['exe']?.toString();
+          if (name != null && exe != null) {
+            apps.add(AppItem(name: name, isEnabled: false, cmdValue: 9, appExe: exe));
+          }
+        }
+      }
+      print("Loaded ${apps.where((a) => a.cmdValue == 9).length} dynamic apps from Firebase");
+    } catch (e) {
+      print('Error fetching dynamic apps: $e');
+    }
+  }
+
+  // Send command to connected desktop.
+  // cmdValue matches the COMMANDS map in ai-commandtoggle.py (1–7 static, 9 dynamic).
+  // appExe is required only for dynamic app toggles (cmdValue == 9).
+  Future<void> _sendCommandToDesktop(String desktopId, int cmdValue, {String? appExe}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || _connectedDesktopId == null) return;
 
     try {
-      await _database
-          .child(desktopId)
-          .child('cmd_value') 
-          .set(cmdValue);
-      
+      await _database.child(desktopId).child('cmd_value').set(cmdValue);
+
+      // For dynamic app toggles the desktop also needs the exe name
+      if (cmdValue == 9 && appExe != null) {
+        await _database.child(desktopId).child('app_exe').set(appExe);
+      }
+
       final rollingcode = await getRTDBValue('$desktopId/rolling_code') ?? 0;
-      await _database
-          .child(desktopId)
-          .child('rolling_code')
-          .set(rollingcode+1);
-      
-      print("command sent to desktop: $desktopId with cmdValue: $cmdValue");
-        
+      await _database.child(desktopId).child('rolling_code').set(rollingcode + 1);
+
+      print("command sent to desktop: $desktopId  cmd_value=$cmdValue${appExe != null ? '  app_exe=$appExe' : ''}");
     } catch (e) {
       print('Error sending command: $e');
     }
@@ -177,6 +215,7 @@ class MyAppState extends ChangeNotifier {
       });
       
       _connectedDesktopId = null;
+      apps.removeWhere((a) => a.cmdValue == 9);
       notifyListeners();
     } catch (e) {
       print('Error disconnecting desktop: $e');

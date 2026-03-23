@@ -9,13 +9,29 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import time
+import importlib.util
 import firebase_admin
 from firebase_admin import credentials, db
-import uuid
 
 cred = credentials.Certificate("rcconfig.json")
 firebase_admin.initialize_app(cred, {'databaseURL': "https://restricter-connector-default-rtdb.firebaseio.com/"})
 ref = db.reference()
+
+# Load ai-commandtoggle.py (hyphen in filename prevents normal import)
+_ct_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai-commandtoggle.py")
+_spec = importlib.util.spec_from_file_location("ai_commandtoggle", _ct_path)
+ct = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(ct)
+
+COMMANDS = {
+    1: ct.toggle_edge,
+    2: ct.toggle_chrome,
+    3: ct.toggle_cmd,
+    4: ct.toggle_total_lockdown,
+    5: ct.toggle_regedit,
+    6: ct.toggle_msi_installer,
+    7: ct.toggle_microsoft_store,
+}
 
 class RestricterDesktop:
     def __init__(self):
@@ -152,6 +168,13 @@ class RestricterDesktop:
         )
         regenerate_button.pack(pady=(10, 5), anchor="w")
 
+        unrestrict_button = ttk.Button(
+            status_frame,
+            text="Unrestrict Everything (Emergency)",
+            command=self.unrestrict_everything
+        )
+        unrestrict_button.pack(pady=(5, 5), anchor="w")
+
         # Instructions box now placed AFTER status/actions
         instructions_frame = ttk.LabelFrame(main_frame, text="How to Connect", padding="15")
         instructions_frame.pack(fill=tk.X, pady=(15, 0))
@@ -175,6 +198,7 @@ class RestricterDesktop:
 
         self.poll_connection_status()
         self.check_cmd_value()
+        threading.Thread(target=self._publish_dynamic_apps, daemon=True).start()
     
     def copy_id(self):
         try:
@@ -206,6 +230,12 @@ class RestricterDesktop:
             self.desktop_id = self.get_or_create_desktop_id()
             self.id_label.config(text=self.desktop_id)
             self.show_status("New Desktop ID generated!", "green")
+
+    def unrestrict_everything(self):
+        if not messagebox.askyesno("Emergency Unrestrict", 
+                                   "This will remove ALL AppLocker restrictions and re-enable Command Prompt.\n\n"
+                                   "Are you sure you want to proceed?"):
+            return
     
     def show_status(self, message, color="black"):
         self.status_label.config(text=f"Status: {message}", foreground=color)
@@ -238,7 +268,42 @@ class RestricterDesktop:
         if self.last_rolling_code != new_rolling_code:
             print(f'rolling code updated. new cmd value: {new_cmd_value}')
             self.last_rolling_code = new_rolling_code
+            threading.Thread(
+                target=self._dispatch_command,
+                args=(new_cmd_value,),
+                daemon=True,
+            ).start()
+
         self.root.after(1000, self.check_cmd_value)
+
+    def _publish_dynamic_apps(self):
+        """Scan installed apps and publish the list to Firebase."""
+        try:
+            apps = ct.get_installed_apps()
+            app_list = [{"name": a["name"], "exe": a["exe"]} for a in apps]
+            ref.child(self.desktop_id).child("dynamic_apps").set(app_list)
+            print(f"Published {len(app_list)} dynamic apps to Firebase")
+        except Exception as e:
+            print(f"Error publishing dynamic apps: {e}")
+
+    def _dispatch_command(self, cmd_value):
+        try:
+            if cmd_value == 9:
+                app_exe = ref.child(self.desktop_id).child('app_exe').get()
+                if app_exe:
+                    ct.ifeo_toggle(app_exe, app_exe)
+                    self.root.after(0, lambda: self.show_status(f"Toggled {app_exe}", "blue"))
+                else:
+                    print("cmd_value=9 received but no app_exe set in database")
+            else:
+                handler = COMMANDS.get(cmd_value)
+                if handler:
+                    handler()
+                    self.root.after(0, lambda: self.show_status(f"Command {cmd_value} executed", "blue"))
+                else:
+                    print(f"Unknown cmd_value: {cmd_value}")
+        except Exception as e:
+            print(f"Error dispatching command {cmd_value}: {e}")
          
     
     def run(self):
@@ -258,5 +323,4 @@ def main():
         print(f"Error: {e}")
         input("Press Enter to exit...")
 
-# need some sort of loop that checks every 5 seconds if the rolling code or cmd_value has changed
 main()
